@@ -1,0 +1,25 @@
+---
+description: Rules for maintaining the design log
+globs: design-log/**
+---
+
+# Design Log Rules
+
+## Structure
+- Create numbered files: `001-feature-name.md`, `002-feature-name.md`
+- Start with title, date, and status (Planning/Implemented/Deprecated)
+
+## Content
+- **Before building:** Document the plan, ask clarifying questions with options (A/B/C)
+- **After building:** Add "Implementation Notes & Lessons Learned" section
+- Mark selected options with ✅ **SELECTED** — don't remove other options
+
+## Lessons Learned Section
+Document:
+- Issues encountered and solutions
+- Architecture decisions and tradeoffs
+- Future improvements (as checklist)
+
+## Keep Updated
+- Update status when implementation completes
+- Add notes whenever bugs are fixed or behavior changes
