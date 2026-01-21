@@ -4,6 +4,7 @@ import { Ship } from './ship.js';
 import { Asteroid, ASTEROID_SIZES, createRandomAsteroid } from './asteroid.js';
 import { Projectile } from './projectile.js';
 import { ParticleSystem } from './particles.js';
+import { Bonus, BONUS_TYPES, shouldDropBonus } from './bonus.js';
 import { circleCollision, toRadians } from './utils.js';
 
 export class Game {
@@ -19,7 +20,11 @@ export class Game {
         this.ship = null;
         this.asteroids = [];
         this.projectiles = [];
+        this.bonuses = [];
         this.particles = new ParticleSystem();
+        
+        // Multi-shot power-up timer
+        this.multiShotTimer = 0;
         
         // Input handling
         this.keys = {};
@@ -84,7 +89,9 @@ export class Game {
         this.ship = new Ship(this.canvas.width / 2, this.canvas.height / 2);
         this.asteroids = [];
         this.projectiles = [];
+        this.bonuses = [];
         this.particles.clear();
+        this.multiShotTimer = 0;
         this.gameState = 'playing';
         this.startNextWave();
     }
@@ -123,7 +130,16 @@ export class Game {
         const noseX = this.ship.x + Math.cos(radians) * this.ship.radius;
         const noseY = this.ship.y + Math.sin(radians) * this.ship.radius;
         
-        this.projectiles.push(new Projectile(noseX, noseY, this.ship.angle));
+        if (this.multiShotTimer > 0) {
+            // Triple shot: forward + 30° left + 30° right
+            this.projectiles.push(new Projectile(noseX, noseY, this.ship.angle));
+            this.projectiles.push(new Projectile(noseX, noseY, this.ship.angle - 30));
+            this.projectiles.push(new Projectile(noseX, noseY, this.ship.angle + 30));
+        } else {
+            // Normal single shot
+            this.projectiles.push(new Projectile(noseX, noseY, this.ship.angle));
+        }
+        
         this.fireCooldown = 1 / this.fireRate;
     }
     
@@ -175,6 +191,19 @@ export class Game {
         // Update asteroids
         for (const asteroid of this.asteroids) {
             asteroid.update(deltaTime, this.canvas.width, this.canvas.height);
+        }
+        
+        // Update bonuses
+        for (let i = this.bonuses.length - 1; i >= 0; i--) {
+            this.bonuses[i].update(deltaTime);
+            if (this.bonuses[i].destroyed) {
+                this.bonuses.splice(i, 1);
+            }
+        }
+        
+        // Update multi-shot timer
+        if (this.multiShotTimer > 0) {
+            this.multiShotTimer -= deltaTime;
         }
         
         // Update particles
@@ -247,6 +276,12 @@ export class Game {
                         // Screen shake based on size
                         this.addScreenShake(asteroid.radius * 0.1, 0.2);
                         
+                        // Check for bonus drop
+                        const bonusType = shouldDropBonus(asteroid.sizeType);
+                        if (bonusType) {
+                            this.bonuses.push(new Bonus(asteroid.x, asteroid.y, bonusType));
+                        }
+                        
                         // Spawn fragments
                         const fragments = asteroid.getFragments();
                         this.asteroids.push(...fragments);
@@ -278,6 +313,52 @@ export class Game {
                 }
             }
         }
+        
+        // Ship vs Bonus - collection
+        for (let i = this.bonuses.length - 1; i >= 0; i--) {
+            const bonus = this.bonuses[i];
+            if (circleCollision(
+                this.ship.x, this.ship.y, this.ship.radius,
+                bonus.x, bonus.y, bonus.radius
+            )) {
+                // Apply bonus effect
+                this.collectBonus(bonus);
+                
+                // Remove collected bonus
+                this.bonuses.splice(i, 1);
+            }
+        }
+    }
+    
+    collectBonus(bonus) {
+        const config = bonus.config;
+        
+        if (bonus.type === 'SCORE') {
+            // Add score
+            this.score += bonus.scoreValue;
+            
+            // Create collection effect with score text
+            this.particles.createBonusCollectionEffect(
+                bonus.x, bonus.y,
+                `+${bonus.scoreValue}`,
+                `rgba(247, 195, 49, 1)` // Gold
+            );
+        } else if (bonus.type === 'MULTISHOT') {
+            // Add to multi-shot timer (stacking)
+            const wasActive = this.multiShotTimer > 0;
+            this.multiShotTimer += 5; // Add 5 seconds
+            
+            // Create collection effect
+            const text = wasActive ? '+5s' : 'TRIPLE SHOT!';
+            this.particles.createBonusCollectionEffect(
+                bonus.x, bonus.y,
+                text,
+                `rgba(78, 205, 196, 1)` // Cyan
+            );
+        }
+        
+        // Small screen shake for feedback
+        this.addScreenShake(3, 0.1);
     }
     
     draw() {
@@ -307,6 +388,11 @@ export class Game {
             // Draw asteroids
             for (const asteroid of this.asteroids) {
                 asteroid.draw(ctx);
+            }
+            
+            // Draw bonuses
+            for (const bonus of this.bonuses) {
+                bonus.draw(ctx);
             }
             
             // Draw ship
@@ -419,6 +505,43 @@ export class Game {
         ctx.font = 'bold 20px "Segoe UI", sans-serif';
         ctx.fillStyle = '#f7c331';
         ctx.fillText(`WAVE ${this.wave}`, this.canvas.width / 2, padding + 20);
+        
+        // Multi-shot timer (if active)
+        if (this.multiShotTimer > 0) {
+            const barWidth = 120;
+            const barHeight = 8;
+            const barX = padding;
+            const barY = padding + healthBarHeight + 15;
+            
+            // Label
+            ctx.textAlign = 'left';
+            ctx.font = 'bold 12px "Segoe UI", sans-serif';
+            ctx.fillStyle = '#4ecdc4';
+            ctx.fillText('TRIPLE SHOT', barX, barY - 3);
+            
+            // Background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+            ctx.fillRect(barX - 1, barY + 2, barWidth + 2, barHeight + 2);
+            
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(barX, barY + 3, barWidth, barHeight);
+            
+            // Timer bar (max 10 seconds displayed)
+            const timerPercent = Math.min(this.multiShotTimer / 10, 1);
+            ctx.fillStyle = '#4ecdc4';
+            ctx.fillRect(barX, barY + 3, barWidth * timerPercent, barHeight);
+            
+            // Border
+            ctx.strokeStyle = '#4ecdc4';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(barX, barY + 3, barWidth, barHeight);
+            
+            // Time remaining text
+            ctx.textAlign = 'right';
+            ctx.font = '10px "Segoe UI", sans-serif';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+            ctx.fillText(`${this.multiShotTimer.toFixed(1)}s`, barX + barWidth, barY - 3);
+        }
     }
     
     drawTitleScreen() {

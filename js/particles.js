@@ -47,9 +47,66 @@ class Particle {
     }
 }
 
+/**
+ * Floating text particle for bonus collection feedback
+ */
+class FloatingText {
+    constructor(x, y, text, color) {
+        this.x = x;
+        this.y = y;
+        this.text = text;
+        this.color = color;
+        this.lifetime = 1.5;
+        this.maxLifetime = 1.5;
+        this.velocityY = -60; // Float upward
+        this.destroyed = false;
+    }
+    
+    update(deltaTime) {
+        this.lifetime -= deltaTime;
+        if (this.lifetime <= 0) {
+            this.destroyed = true;
+            return;
+        }
+        
+        this.y += this.velocityY * deltaTime;
+        // Slow down as it rises
+        this.velocityY *= 0.98;
+    }
+    
+    draw(ctx) {
+        const lifeRatio = this.lifetime / this.maxLifetime;
+        const scale = 0.8 + lifeRatio * 0.4; // Start bigger, shrink slightly
+        
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.scale(scale, scale);
+        
+        ctx.font = 'bold 20px "Segoe UI", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Glow effect
+        ctx.shadowColor = this.color;
+        ctx.shadowBlur = 10;
+        
+        // Text with alpha
+        ctx.fillStyle = this.color.replace('1)', `${lifeRatio})`);
+        ctx.fillText(this.text, 0, 0);
+        
+        // White outline for readability
+        ctx.strokeStyle = `rgba(255, 255, 255, ${lifeRatio * 0.8})`;
+        ctx.lineWidth = 1;
+        ctx.strokeText(this.text, 0, 0);
+        
+        ctx.restore();
+    }
+}
+
 export class ParticleSystem {
     constructor() {
         this.particles = [];
+        this.floatingTexts = [];
     }
     
     update(deltaTime) {
@@ -59,11 +116,22 @@ export class ParticleSystem {
                 this.particles.splice(i, 1);
             }
         }
+        
+        for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+            this.floatingTexts[i].update(deltaTime);
+            if (this.floatingTexts[i].destroyed) {
+                this.floatingTexts.splice(i, 1);
+            }
+        }
     }
     
     draw(ctx) {
         for (const particle of this.particles) {
             particle.draw(ctx);
+        }
+        
+        for (const text of this.floatingTexts) {
+            text.draw(ctx);
         }
     }
     
@@ -176,6 +244,40 @@ export class ParticleSystem {
     
     clear() {
         this.particles = [];
+        this.floatingTexts = [];
+    }
+    
+    /**
+     * Create bonus collection effect with flash, particles, and floating text
+     */
+    createBonusCollectionEffect(x, y, text, color) {
+        // Floating text
+        this.floatingTexts.push(new FloatingText(x, y, text, color));
+        
+        // Particle burst
+        const burstCount = 10;
+        for (let i = 0; i < burstCount; i++) {
+            const angle = randomRange(0, Math.PI * 2);
+            const speed = randomRange(80, 150);
+            const size = randomRange(3, 6);
+            const lifetime = randomRange(0.3, 0.6);
+            
+            this.particles.push(new Particle(
+                x, y, color, size, speed, angle, lifetime
+            ));
+        }
+        
+        // Bright flash particles (white/light colored)
+        for (let i = 0; i < 5; i++) {
+            const angle = randomRange(0, Math.PI * 2);
+            const speed = randomRange(50, 100);
+            const size = randomRange(4, 8);
+            const lifetime = randomRange(0.15, 0.3);
+            
+            this.particles.push(new Particle(
+                x, y, 'rgba(255, 255, 255, 1)', size, speed, angle, lifetime
+            ));
+        }
     }
 }
 
