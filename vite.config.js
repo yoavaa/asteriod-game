@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { resolve } from 'path';
 
 export default defineConfig({
   // Base path for deployment (use './' for relative paths)
@@ -13,6 +14,14 @@ export default defineConfig({
     
     // Minify for production
     minify: 'esbuild',
+    
+    // Multi-page app: build both index.html and game.html
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        game: resolve(__dirname, 'game.html'),
+      },
+    },
   },
   
   server: {
