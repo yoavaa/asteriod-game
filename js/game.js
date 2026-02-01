@@ -5,6 +5,7 @@ import { Asteroid, ASTEROID_SIZES, createRandomAsteroid } from './asteroid.js';
 import { Projectile } from './projectile.js';
 import { ParticleSystem } from './particles.js';
 import { Bonus, BONUS_TYPES, shouldDropBonus } from './bonus.js';
+import { ETSpaceship } from './et.js';
 import { circleCollision, toRadians } from './utils.js';
 
 export class Game {
@@ -25,6 +26,13 @@ export class Game {
         
         // Multi-shot power-up timer
         this.multiShotTimer = 0;
+        
+        // ET spaceship
+        this.et = null;
+        this.etSpawnTimer = 10; // First spawn after 10 seconds
+        this.etSpawnInterval = 10; // Spawn every 10 seconds
+        this.etWarningMessage = null;
+        this.etWarningTimer = 0;
         
         // Input handling
         this.keys = {};
@@ -92,6 +100,10 @@ export class Game {
         this.bonuses = [];
         this.particles.clear();
         this.multiShotTimer = 0;
+        this.et = null;
+        this.etSpawnTimer = 10;
+        this.etWarningMessage = null;
+        this.etWarningTimer = 0;
         this.gameState = 'playing';
         this.startNextWave();
     }
@@ -146,6 +158,12 @@ export class Game {
     addScreenShake(amount, duration) {
         this.shakeAmount = Math.max(this.shakeAmount, amount);
         this.shakeDuration = Math.max(this.shakeDuration, duration);
+    }
+    
+    spawnET() {
+        this.et = new ETSpaceship(this.canvas.width, this.canvas.height);
+        this.etWarningMessage = 'ET INCOMING!';
+        this.etWarningTimer = 2; // Show for 2 seconds
     }
     
     update(deltaTime) {
@@ -206,6 +224,31 @@ export class Game {
             this.multiShotTimer -= deltaTime;
         }
         
+        // Update ET warning message
+        if (this.etWarningTimer > 0) {
+            this.etWarningTimer -= deltaTime;
+            if (this.etWarningTimer <= 0) {
+                this.etWarningMessage = null;
+            }
+        }
+        
+        // Update ET spawn timer
+        if (!this.et && this.etSpawnTimer > 0) {
+            this.etSpawnTimer -= deltaTime;
+            if (this.etSpawnTimer <= 0) {
+                this.spawnET();
+            }
+        }
+        
+        // Update ET
+        if (this.et) {
+            this.et.update(deltaTime, this.ship.x, this.ship.y);
+            if (this.et.destroyed) {
+                this.et = null;
+                this.etSpawnTimer = this.etSpawnInterval;
+            }
+        }
+        
         // Update particles
         this.particles.update(deltaTime);
         
@@ -226,6 +269,9 @@ export class Game {
             this.waveTimer = this.wavePauseDuration;
             // Wave bonus
             this.score += this.wave * 50;
+            // Clear ET on wave complete (it escapes)
+            this.et = null;
+            this.etSpawnTimer = this.etSpawnInterval;
         }
         
         // Check for game over
@@ -328,6 +374,87 @@ export class Game {
                 this.bonuses.splice(i, 1);
             }
         }
+        
+        // Projectile vs ET
+        if (this.et) {
+            for (let p = this.projectiles.length - 1; p >= 0; p--) {
+                const projectile = this.projectiles[p];
+                
+                if (circleCollision(
+                    projectile.x, projectile.y, projectile.radius,
+                    this.et.x, this.et.y, this.et.radius
+                )) {
+                    projectile.destroyed = true;
+                    
+                    // Award points for hit
+                    this.score += this.et.pointsPerHit;
+                    
+                    // Hit effect
+                    this.particles.createExplosion(
+                        projectile.x, projectile.y,
+                        '#ff00ff',
+                        8, 150, 4
+                    );
+                    
+                    if (this.et.hit()) {
+                        // ET destroyed - give bonus!
+                        this.score += this.et.killBonus;
+                        
+                        // Award multi-shot bonus (+10 seconds)
+                        const wasActive = this.multiShotTimer > 0;
+                        this.multiShotTimer += 10;
+                        
+                        // Big explosion
+                        this.particles.createExplosion(
+                            this.et.x, this.et.y,
+                            '#ff00ff',
+                            30, 300, 8
+                        );
+                        
+                        // Bonus text
+                        const text = wasActive ? 'TRIPLE SHOT +10s!' : 'TRIPLE SHOT!';
+                        this.particles.createBonusCollectionEffect(
+                            this.et.x, this.et.y,
+                            text,
+                            'rgba(255, 0, 255, 1)'
+                        );
+                        
+                        // Screen shake
+                        this.addScreenShake(12, 0.4);
+                        
+                        // ET is destroyed, will be cleaned up in update
+                        this.et = null;
+                        this.etSpawnTimer = this.etSpawnInterval;
+                    }
+                    
+                    break;
+                }
+            }
+        }
+        
+        // ET vs Small Asteroids (ET destroys them)
+        if (this.et) {
+            for (let a = this.asteroids.length - 1; a >= 0; a--) {
+                const asteroid = this.asteroids[a];
+                
+                // Only destroy SMALL asteroids
+                if (asteroid.sizeType !== 'SMALL') continue;
+                
+                if (circleCollision(
+                    this.et.x, this.et.y, this.et.radius,
+                    asteroid.x, asteroid.y, asteroid.radius
+                )) {
+                    // Destroy the asteroid
+                    this.particles.createExplosion(
+                        asteroid.x, asteroid.y,
+                        asteroid.color.fill,
+                        10, 100, 3
+                    );
+                    
+                    this.asteroids.splice(a, 1);
+                }
+            }
+        }
     }
     
     collectBonus(bonus) {
@@ -393,6 +520,11 @@ export class Game {
             // Draw bonuses
             for (const bonus of this.bonuses) {
                 bonus.draw(ctx);
+            }
+            
+            // Draw ET
+            if (this.et) {
+                this.et.draw(ctx);
             }
             
             // Draw ship
@@ -541,6 +673,23 @@ export class Game {
             ctx.font = '10px "Segoe UI", sans-serif';
             ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
             ctx.fillText(`${this.multiShotTimer.toFixed(1)}s`, barX + barWidth, barY - 3);
+        }
+        
+        // ET Warning Message
+        if (this.etWarningMessage && this.etWarningTimer > 0) {
+            const centerX = this.canvas.width / 2;
+            const warningY = 100;
+            
+            // Pulsing effect
+            const pulse = Math.sin(this.etWarningTimer * 10) * 0.3 + 0.7;
+            
+            ctx.textAlign = 'center';
+            ctx.font = 'bold 36px "Segoe UI", sans-serif';
+            ctx.shadowColor = '#ff00ff';
+            ctx.shadowBlur = 20 * pulse;
+            ctx.fillStyle = `rgba(255, 0, 255, ${pulse})`;
+            ctx.fillText(this.etWarningMessage, centerX, warningY);
+            ctx.shadowBlur = 0;
         }
     }
     

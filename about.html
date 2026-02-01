@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteroids - Modern Edition | Design-Log Methodology Demo</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-card: #12121a;
+            --accent: #00d4ff;
+            --accent-glow: rgba(0, 212, 255, 0.3);
+            --text: #e0e0e0;
+            --text-muted: #888;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        /* Starfield background */
+        .stars {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: 
+                radial-gradient(1px 1px at 20% 30%, white 0%, transparent 100%),
+                radial-gradient(1px 1px at 40% 70%, rgba(255,255,255,0.8) 0%, transparent 100%),
+                radial-gradient(1px 1px at 50% 40%, rgba(255,255,255,0.6) 0%, transparent 100%),
+                radial-gradient(2px 2px at 60% 20%, white 0%, transparent 100%),
+                radial-gradient(1px 1px at 70% 60%, rgba(255,255,255,0.7) 0%, transparent 100%),
+                radial-gradient(1px 1px at 80% 10%, white 0%, transparent 100%),
+                radial-gradient(2px 2px at 90% 80%, rgba(255,255,255,0.9) 0%, transparent 100%),
+                radial-gradient(1px 1px at 10% 90%, white 0%, transparent 100%),
+                radial-gradient(1px 1px at 30% 50%, rgba(255,255,255,0.5) 0%, transparent 100%),
+                radial-gradient(1px 1px at 85% 35%, white 0%, transparent 100%);
+            z-index: 0;
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 24px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            margin-bottom: 40px;
+        }
+
+        .play-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+            padding: 18px 48px;
+            font-size: 1.3rem;
+            font-weight: 600;
+            text-decoration: none;
+            color: var(--bg-dark);
+            background: linear-gradient(135deg, var(--accent) 0%, #00a8cc 100%);
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 30px var(--accent-glow);
+        }
+
+        .play-btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 0 50px var(--accent-glow), 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .play-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        section {
+            margin-bottom: 50px;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        h2::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 28px;
+            background: var(--accent);
+            border-radius: 2px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 24px;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+        }
+
+        .feature {
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .feature h3 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: var(--accent);
+        }
+
+        .feature p {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        .methodology-highlights {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .highlight {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .highlight-icon {
+            flex-shrink: 0;
+            width: 40px;
+            height: 40px;
+            background: rgba(0, 212, 255, 0.1);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--accent);
+        }
+
+        .highlight-content h3 {
+            font-size: 1.1rem;
+            margin-bottom: 4px;
+        }
+
+        .highlight-content p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+        }
+
+        .control {
+            text-align: center;
+            padding: 16px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 10px;
+        }
+
+        .key {
+            display: inline-block;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            margin-bottom: 8px;
+        }
+
+        .control-label {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        .links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .links a {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 20px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: var(--text);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .links a:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        footer {
+            text-align: center;
+            padding-top: 40px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        footer a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        @media (max-width: 600px) {
+            h1 {
+                font-size: 2.2rem;
+            }
+            
+            .container {
+                padding: 40px 16px;
+            }
+            
+            .play-btn {
+                padding: 16px 36px;
+                font-size: 1.1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="stars"></div>
+    
+    <div class="container">
+        <header>
+            <h1>Asteroids</h1>
+            <p class="subtitle">Modern Edition — A Design-Log Methodology Demo</p>
+            <a href="index.html" class="play-btn">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z"/>
+                </svg>
+                Play Game
+            </a>
+        </header>
+
+        <section>
+            <h2>About This Project</h2>
+            <div class="card">
+                <p style="margin-bottom: 20px;">
+                    This project demonstrates the <strong>Design-Log Methodology</strong> in practice — a structured approach to AI-assisted software development that eliminates "context drift" and transforms AI from a simple coder into a true architectural partner.
+                </p>
+                <p>
+                    Every significant feature in this game was designed through a design log before implementation, showing how the methodology enables consistent, traceable, and high-quality development with AI.
+                </p>
+            </div>
+        </section>
+
+        <section>
+            <h2>Methodology Benefits</h2>
+            <div class="card">
+                <div class="methodology-highlights">
+                    <div class="highlight">
+                        <div class="highlight-icon">✓</div>
+                        <div class="highlight-content">
+                            <h3>Zero-Drift Implementation</h3>
+                            <p>AI maintains architectural consistency across features without losing context</p>
+                        </div>
+                    </div>
+                    <div class="highlight">
+                        <div class="highlight-icon">→</div>
+                        <div class="highlight-content">
+                            <h3>Simple Prompting</h3>
+                            <p>Complex features can be initiated with single sentences</p>
+                        </div>
+                    </div>
+                    <div class="highlight">
+                        <div class="highlight-icon">◎</div>
+                        <div class="highlight-content">
+                            <h3>Traceable Decisions</h3>
+                            <p>Full history of design choices and their rationale</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Game Features</h2>
+            <div class="features">
+                <div class="feature">
+                    <h3>Physics Engine</h3>
+                    <p>Ship movement with realistic thrust and inertia</p>
+                </div>
+                <div class="feature">
+                    <h3>Progressive Waves</h3>
+                    <p>Increasing difficulty with multiple asteroid sizes</p>
+                </div>
+                <div class="feature">
+                    <h3>Power-Ups</h3>
+                    <p>Score bonuses and Triple Shot abilities</p>
+                </div>
+                <div class="feature">
+                    <h3>Visual Effects</h3>
+                    <p>Particle explosions and screen shake</p>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Controls</h2>
+            <div class="card">
+                <div class="controls-grid">
+                    <div class="control">
+                        <div class="key">A / D</div>
+                        <div class="control-label">Rotate Ship</div>
+                    </div>
+                    <div class="control">
+                        <div class="key">W / ↑</div>
+                        <div class="control-label">Thrust</div>
+                    </div>
+                    <div class="control">
+                        <div class="key">Space</div>
+                        <div class="control-label">Shoot</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <h2>Learn More</h2>
+            <div class="links">
+                <a href="https://github.com/yoavaa/design-log-methodology" target="_blank">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                    </svg>
+                    Design-Log Methodology
+                </a>
+                <a href="https://github.com/yoavaa/design-log-methodology/blob/main/Why%20I%20Stop%20Prompting%20and%20Start%20Logging_%20The%20Design-Log%20Methodology.pdf" target="_blank">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zM14 3.5L18.5 8H14V3.5zM16 13H8v-2h8v2zm0 4H8v-2h8v2zm-3-8H8V7h5v2z"/>
+                    </svg>
+                    Deep Dive Presentation
+                </a>
+            </div>
+        </section>
+
+        <footer>
+            <p>MIT License · Built with the <a href="https://github.com/yoavaa/design-log-methodology" target="_blank">Design-Log Methodology</a></p>
+        </footer>
+    </div>
+</body>
+</html>
